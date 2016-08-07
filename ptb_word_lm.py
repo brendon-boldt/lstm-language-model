@@ -61,7 +61,8 @@ import time
 import numpy as np
 import tensorflow as tf
 
-from tensorflow.models.rnn.ptb import reader
+#from tensorflow.models.rnn.ptb import reader
+import reader
 
 flags = tf.flags
 logging = tf.logging
@@ -251,7 +252,7 @@ class CustomConfig(object):
   keep_prob = 1.0
   lr_decay = 0.5
   batch_size = 20
-  vocab_size = 100
+  vocab_size = 10000
 
 
 def run_epoch(session, m, data, eval_op, verbose=False):
