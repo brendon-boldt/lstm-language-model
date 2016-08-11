@@ -296,7 +296,8 @@ def get_config():
 
 def main(_):
   if not FLAGS.data_path:
-    raise ValueError("Must set --data_path to PTB data directory")
+    #raise ValueError("Must set --data_path to PTB data directory")
+    FLAGS.data_path = "./data/"
 
   raw_data = reader.ptb_raw_data(FLAGS.data_path)
   train_data, valid_data, test_data, _ = raw_data

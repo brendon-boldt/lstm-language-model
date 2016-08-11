@@ -74,7 +74,8 @@ def _divide_data(train_prop = 0.8):
 
   counter = collections.Counter(train_data)
   count_pairs = sorted(counter.items(), key=lambda x: (-x[1], x[0]))
-  vocab = set([count_pairs[i][0] for i in range(0, args.vocab_size)])
+  actual_size = min(args.vocab_size, len(count_pairs))
+  vocab = set([count_pairs[i][0] for i in range(0, actual_size)])
 
   for i in range(0, len(train_data)):
     if not train_data[i] in vocab:
