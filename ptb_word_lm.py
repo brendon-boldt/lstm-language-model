@@ -134,6 +134,15 @@ class PTBModel(object):
     self._cost = cost = tf.reduce_sum(loss) / batch_size
     self._final_state = state
 
+    ###
+    targets_cast = tf.to_int64(tf.reshape(self._targets, [-1]))
+    #equalities = tf.equal(tf.argmax(logits, 1), targets_cast)
+    #self._accuracy = tf.reduce_mean(tf.to_int32(equalities))
+    equalities = tf.nn.in_top_k(logits, tf.reshape(self._targets, [-1]), 500)
+    self._accuracy = tf.reduce_mean(tf.to_int32(equalities))
+
+    # Calculate top 3 predictions as well
+
     if not is_training:
       return
 
@@ -158,6 +167,10 @@ class PTBModel(object):
   @property
   def initial_state(self):
     return self._initial_state
+
+  @property
+  def accuracy(self):
+    return self._accuracy
 
   @property
   def cost(self):
@@ -261,20 +274,24 @@ def run_epoch(session, m, data, eval_op, verbose=False):
   start_time = time.time()
   costs = 0.0
   iters = 0
+  accs = []
   state = m.initial_state.eval()
   for step, (x, y) in enumerate(reader.ptb_iterator(data, m.batch_size,
                                                     m.num_steps)):
-    cost, state, _ = session.run([m.cost, m.final_state, eval_op],
+    acc, cost, state, _ = session.run([m.accuracy, m.cost, m.final_state, eval_op],
                                  {m.input_data: x,
                                   m.targets: y,
                                   m.initial_state: state})
     costs += cost
     iters += m.num_steps
 
+    accs.append(acc)
+
     if verbose and step % (epoch_size // 10) == 10:
       print("%.3f perplexity: %.3f speed: %.0f wps" %
             (step * 1.0 / epoch_size, np.exp(costs / iters),
              iters * m.batch_size / (time.time() - start_time)))
+      print("accuracy: %.3f" % (sum(accs)/len(accs)))
 
   return np.exp(costs / iters)
 

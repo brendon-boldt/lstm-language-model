@@ -16,7 +16,6 @@ args = parser.parse_args()
 args.out_dir = args.out_dir.rstrip('/')+'/'
 
 '''
-- I will have to write code to cap the vocab size
 - In the PTB <unk> was the second most common token
 '''
 
