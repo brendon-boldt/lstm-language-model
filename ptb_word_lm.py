@@ -100,6 +100,8 @@ class PTBModel(object):
 
     with tf.device("/cpu:0"):
       embedding = tf.get_variable("embedding", [vocab_size, size])
+      #embedding = tf.get_variable("embedding", [10000, size])
+      #embedding = tf.
       inputs = tf.nn.embedding_lookup(embedding, self._input_data)
 
     if is_training and config.keep_prob < 1:
@@ -136,12 +138,15 @@ class PTBModel(object):
 
     ###
     targets_cast = tf.to_int64(tf.reshape(self._targets, [-1]))
-    #equalities = tf.equal(tf.argmax(logits, 1), targets_cast)
-    #self._accuracy = tf.reduce_mean(tf.to_int32(equalities))
-    equalities = tf.nn.in_top_k(logits, tf.reshape(self._targets, [-1]), 500)
-    self._accuracy = tf.reduce_mean(tf.to_int32(equalities))
+    in_top10 = tf.nn.in_top_k(logits, tf.reshape(self._targets, [-1]), 10)
+    in_top5 = tf.nn.in_top_k(logits, tf.reshape(self._targets, [-1]), 5)
+    in_top1 = tf.nn.in_top_k(logits, tf.reshape(self._targets, [-1]), 1)
 
-    # Calculate top 3 predictions as well
+    top10_accuracy = tf.reduce_mean(tf.to_float(in_top10))
+    top5_accuracy = tf.reduce_mean(tf.to_float(in_top5)) 
+    top1_accuracy = tf.reduce_mean(tf.to_float(in_top1)) 
+
+    self._accuracies = (top1_accuracy, top5_accuracy, top10_accuracy)
 
     if not is_training:
       return
@@ -169,8 +174,8 @@ class PTBModel(object):
     return self._initial_state
 
   @property
-  def accuracy(self):
-    return self._accuracy
+  def accuracies(self):
+    return self._accuracies
 
   @property
   def cost(self):
@@ -204,7 +209,6 @@ class SmallConfig(object):
   batch_size = 20
   vocab_size = 10000
 
-
 class MediumConfig(object):
   """Medium config."""
   init_scale = 0.05
@@ -219,7 +223,6 @@ class MediumConfig(object):
   lr_decay = 0.8
   batch_size = 20
   vocab_size = 10000
-
 
 class LargeConfig(object):
   """Large config."""
@@ -265,7 +268,7 @@ class CustomConfig(object):
   keep_prob = 1.0
   lr_decay = 0.5
   batch_size = 20
-  vocab_size = 10000
+  vocab_size = 20
 
 
 def run_epoch(session, m, data, eval_op, verbose=False):
@@ -274,24 +277,47 @@ def run_epoch(session, m, data, eval_op, verbose=False):
   start_time = time.time()
   costs = 0.0
   iters = 0
-  accs = []
+  #accs = np.array([[]])
+  top10 = 0
+  top5 = 0
+  top1 = 0
+  num_predictions = 0
   state = m.initial_state.eval()
   for step, (x, y) in enumerate(reader.ptb_iterator(data, m.batch_size,
                                                     m.num_steps)):
-    acc, cost, state, _ = session.run([m.accuracy, m.cost, m.final_state, eval_op],
+    accuracies, cost, state, _ = session.run([m.accuracies, m.cost, m.final_state, eval_op],
                                  {m.input_data: x,
                                   m.targets: y,
                                   m.initial_state: state})
     costs += cost
     iters += m.num_steps
 
-    accs.append(acc)
+    
+    top1 += x.shape[0] * accuracies[0]
+    top5 += x.shape[0] * accuracies[1]
+    top10 += x.shape[0] * accuracies[2]
+    num_predictions += x.shape[0]
+    '''
+    print(acc)
+    if (accs.size == 0):
+      accs = np.append(accs, [acc])
+    else:
+      accs = np.append(accs, [acc], axis=0)
+    #accs.append(acc)
+    #print(accs)
+    '''
 
-    if verbose and step % (epoch_size // 10) == 10:
+    #print(step % (epoch_size // 10))
+    if verbose and step % max(1,(epoch_size // 10)) == 1:
       print("%.3f perplexity: %.3f speed: %.0f wps" %
             (step * 1.0 / epoch_size, np.exp(costs / iters),
              iters * m.batch_size / (time.time() - start_time)))
-      print("accuracy: %.3f" % (sum(accs)/len(accs)))
+      #print("accuracy: %.3f" % (np.sum(np.prod(accs, axis=1))/np.sum(accs[0][:])))
+      if (num_predictions != 0):
+        print("top1%%: %.3f" % (top1/num_predictions))
+        print("top5%%: %.3f" % (top5/num_predictions))
+        print("top10%%: %.3f" % (top10/num_predictions))
+      top1, top5, top10, num_predictions = 0, 0, 0, 0
 
   return np.exp(costs / iters)
 

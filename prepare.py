@@ -53,7 +53,7 @@ def _divide_data(train_prop = 0.8):
   '''
   counter = collections.Counter(raw_data)
   count_pairs = sorted(counter.items(), key=lambda x: (-x[1], x[0]))
-  vocab = set([count_pairs[i][0] for i in range(0, args.vocab_size)])
+  vocab = set([count_pairs[i][0] for i in range(0, min(len(count_pairs),args.vocab_size))])
 
   for i in range(0, size):
     if not raw_data[i] in vocab:
@@ -73,7 +73,9 @@ def _divide_data(train_prop = 0.8):
 
   counter = collections.Counter(train_data)
   count_pairs = sorted(counter.items(), key=lambda x: (-x[1], x[0]))
-  actual_size = min(args.vocab_size, len(count_pairs))
+  # len(count_pairs) - 1 because if we do not have at least one <unk> token
+  # in the training set, that well cause problems for the test/valid set
+  actual_size = min(args.vocab_size, len(count_pairs)-1)
   vocab = set([count_pairs[i][0] for i in range(0, actual_size)])
 
   for i in range(0, len(train_data)):

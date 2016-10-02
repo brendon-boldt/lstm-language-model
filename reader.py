@@ -45,6 +45,13 @@ def _build_vocab(filename):
 
 def _file_to_word_ids(filename, word_to_id):
   data = _read_words(filename)
+  '''
+  count = 0;
+  for w in data:
+    if not w in word_to_id.keys():
+      count += 1
+  print(count)
+  '''
   return [word_to_id[word] for word in data]
 
 
