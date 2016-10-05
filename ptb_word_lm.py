@@ -282,7 +282,7 @@ def run_epoch(session, m, data, eval_op, verbose=False):
   top5 = 0
   top1 = 0
   num_predictions = 0
-  state = m.initial_state.eval()
+  state = session.run(m.initial_state)
   for step, (x, y) in enumerate(reader.ptb_iterator(data, m.batch_size,
                                                     m.num_steps)):
     accuracies, cost, state, _ = session.run([m.accuracies, m.cost, m.final_state, eval_op],
