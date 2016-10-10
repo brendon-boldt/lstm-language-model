@@ -11,7 +11,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument('infile')
 parser.add_argument('-o', '--out_dir', nargs='?', default='./')
 parser.add_argument('-v', '--vocab_size', type=int, nargs='?', default=10000)
-parser.add_argument('-f', '--frequency', action='store_true')
+parser.add_argument('-f', '--frequency', action='store_true', help='create graph of token frequencies')
 args = parser.parse_args()
 args.out_dir = args.out_dir.rstrip('/')+'/'
 
@@ -47,7 +47,7 @@ def _next_sentence_index(data, start):
 def _divide_data(train_prop = 0.8):
   with tf.gfile.GFile(args.infile, "r") as f:
     #raw_data = f.read().replace("\n", "<eos>").split(" ")
-    raw_data = f.read().split(" ")
+    raw_data = f.read().decode('utf-8').split(" ")
   size = len(raw_data)
 
   '''
