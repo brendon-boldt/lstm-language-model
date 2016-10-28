@@ -42,6 +42,8 @@ flags.DEFINE_string("save_path", "tf_log/",
                     "Model output directory.")
 flags.DEFINE_bool("use_fp16", False,
                   "Train using 16-bit floats instead of 32bit floats")
+flags.DEFINE_bool("test", False,
+                  "Test model specfied by save_path.")
 
 FLAGS = flags.FLAGS
 
@@ -152,6 +154,10 @@ class PTBModel(object):
 
   def assign_lr(self, session, lr_value):
     session.run(self._lr_update, feed_dict={self._new_lr: lr_value})
+
+  @property
+  def saver(self):
+    return self._saver
 
   @property
   def input(self):
@@ -303,10 +309,12 @@ def run_epoch(session, model, eval_op=None, verbose=False):
       print("%.3f perplexity: %.3f speed: %.0f wps" %
             (step * 1.0 / model.input.epoch_size, np.exp(costs / iters),
              iters * model.input.batch_size / (time.time() - start_time)))
+      '''
       if (num_predictions != 0):
         print("top1 : %.3f" % (top1/num_predictions))
         print("top5 : %.3f" % (top5/num_predictions))
         print("top10: %.3f" % (top10/num_predictions))
+      '''
       top1, top5, top10, num_predictions = 0, 0, 0, 0
 
   return np.exp(costs / iters)
@@ -330,6 +338,7 @@ def get_config():
 def main(_):
   if not FLAGS.data_path:
     raise ValueError("Must set --data_path to PTB data directory")
+  FLAGS.save_path = FLAGS.save_path.strip('/') + '-' + FLAGS.model + '/'
 
   raw_data = reader.ptb_raw_data(FLAGS.data_path)
   train_data, valid_data, test_data, _ = raw_data
@@ -363,24 +372,30 @@ def main(_):
                          input_=test_input)
 
     sv = tf.train.Supervisor(logdir=FLAGS.save_path)
-    with sv.managed_session() as session:
-      for i in range(config.max_max_epoch):
-        lr_decay = config.lr_decay ** max(i - config.max_epoch, 0.0)
-        m.assign_lr(session, config.learning_rate * lr_decay)
 
-        print("Epoch: %d Learning rate: %.3f" % (i + 1, session.run(m.lr)))
-        train_perplexity = run_epoch(session, m, eval_op=m.train_op,
-                                     verbose=True)
-        print("Epoch: %d Train Perplexity: %.3f" % (i + 1, train_perplexity))
-        valid_perplexity = run_epoch(session, mvalid)
-        print("Epoch: %d Valid Perplexity: %.3f" % (i + 1, valid_perplexity))
+    with sv.managed_session() as session:
+      if FLAGS.test:
+        print("Restoring model from " + FLAGS.save_path)
+        m.saver.restore(session, FLAGS.save_path + '-0')
+      else:
+        for i in range(config.max_max_epoch):
+          lr_decay = config.lr_decay ** max(i - config.max_epoch, 0.0)
+          m.assign_lr(session, config.learning_rate * lr_decay)
+
+          print("Epoch: %d Learning rate: %.3f" % (i + 1, session.run(m.lr)))
+          train_perplexity = run_epoch(session, m, eval_op=m.train_op,
+                                       verbose=True)
+          print("Epoch: %d Train Perplexity: %.3f" % (i + 1, train_perplexity))
+          valid_perplexity = run_epoch(session, mvalid)
+          print("Epoch: %d Valid Perplexity: %.3f" % (i + 1, valid_perplexity))
 
       test_perplexity = run_epoch(session, mtest)
       print("Test Perplexity: %.3f" % test_perplexity)
 
-      if FLAGS.save_path:
+      if not FLAGS.test and FLAGS.save_path:
         print("Saving model to %s." % FLAGS.save_path)
-        sv.saver.save(session, FLAGS.save_path, global_step=sv.global_step)
+        sv.saver.save(session, FLAGS.save_path, global_step=0)
+        #sv.saver.save(session, FLAGS.save_path, global_step=sv.global_step)
 
 
 if __name__ == "__main__":
