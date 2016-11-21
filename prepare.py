@@ -1,6 +1,7 @@
 import sys
 import argparse
 import collections
+import math
 import tensorflow as tf
 import numpy as np
 
@@ -11,7 +12,8 @@ parser = argparse.ArgumentParser(
 parser.add_argument('infile')
 parser.add_argument('-o', '--out_dir', nargs='?', default='./')
 parser.add_argument('-v', '--vocab_size', type=int, nargs='?', default=10000)
-parser.add_argument('-f', '--frequency', action='store_true', help='create graph of token frequencies')
+parser.add_argument('-f', '--frequency', action='store_true', help='print token frequencies')
+parser.add_argument('-e', '--entropy', action='store_true', help='computer Shannon entropy of data set')
 args = parser.parse_args()
 args.out_dir = args.out_dir.rstrip('/')+'/'
 
@@ -19,13 +21,37 @@ args.out_dir = args.out_dir.rstrip('/')+'/'
 - In the PTB <unk> was the second most common token
 '''
 
+def _get_entropy():
+  data = reader._read_words(args.infile)
+  counter = collections.Counter(data)
+  count_pairs = sorted(counter.items(), key=lambda x: (-x[1], x[0]))
+  unk_sum = 0
+  for v in count_pairs[args.vocab_size:]:
+    unk_sum += v[1]
+  vocab_pairs = count_pairs[:args.vocab_size]
+  if (unk_sum > 0):
+    vocab_pairs[-1] = ("<unk>",unk_sum)
+  log_sum = 0
+  for pair in vocab_pairs:
+    log_sum += math.log2(pair[1]/len(data))
+
+  #return math.exp(-log_sum/len(vocab_pairs))
+  return -log_sum/len(vocab_pairs)
+
+
 def _get_word_frequency():
   data = reader._read_words(args.infile)
   counter = collections.Counter(data)
   count_pairs = sorted(counter.items(), key=lambda x: (-x[1], x[0]))
+  unk_sum = 0
+  for v in count_pairs[args.vocab_size:]:
+    unk_sum += v[1]/len(data)
   string = ""
-  for v in count_pairs[:100]:
+  for v in count_pairs[:min(100, args.vocab_size)]:
     #string += (str(v[0]) + "\n" +  str(v[1]/len(data))) + "\n\n"
+    if (unk_sum > v[1]/len(data)):
+      string += str(unk_sum) + "\t<unk>\n"
+      unk_sum = 0
     string += (str(v[1]/len(data)) + "\t" + str(v[0])) + "\n"
   return string
 
@@ -100,6 +126,8 @@ def _write_data(train_data, valid_data, test_data):
 
 if (args.frequency):
   print(_get_word_frequency())
+elif (args.entropy):
+  print(_get_entropy())
 else:
   raw_data = _divide_data()
   _write_data(*raw_data)
