@@ -123,9 +123,12 @@ class PTBModel(object):
 
     ###
     targets_cast = tf.to_int64(tf.reshape(input_.targets, [-1]))
-    in_top10 = tf.nn.in_top_k(logits, tf.reshape(input_.targets, [-1]), 10)
-    in_top5 = tf.nn.in_top_k(logits, tf.reshape(input_.targets, [-1]), 5)
-    in_top1 = tf.nn.in_top_k(logits, tf.reshape(input_.targets, [-1]), 1)
+    in_top10 = tf.nn.in_top_k(
+        tf.to_float(logits), tf.reshape(input_.targets, [-1]), 10)
+    in_top5 = tf.nn.in_top_k(
+        tf.to_float(logits), tf.reshape(input_.targets, [-1]), 5)
+    in_top1 = tf.nn.in_top_k(
+        tf.to_float(logits), tf.reshape(input_.targets, [-1]), 1)
 
     top10_accuracy = tf.reduce_mean(tf.to_float(in_top10))
     top5_accuracy = tf.reduce_mean(tf.to_float(in_top5)) 
@@ -352,31 +355,39 @@ def main(_):
     initializer = tf.random_uniform_initializer(-config.init_scale,
                                                 config.init_scale)
 
-    with tf.name_scope("Train"):
-      train_input = PTBInput(config=config, data=train_data, name="TrainInput")
-      with tf.variable_scope("Model", reuse=None, initializer=initializer):
-        m = PTBModel(is_training=True, config=config, input_=train_input)
-      tf.scalar_summary("Training Loss", m.cost)
-      tf.scalar_summary("Learning Rate", m.lr)
+    if not FLAGS.test:
+      with tf.name_scope("Train"):
+        train_input = PTBInput(config=config, data=train_data, name="TrainInput")
+        with tf.variable_scope("Model", reuse=None, initializer=initializer):
+          m = PTBModel(is_training=True, config=config, input_=train_input)
+        tf.scalar_summary("Training Loss", m.cost)
+        tf.scalar_summary("Learning Rate", m.lr)
 
-    with tf.name_scope("Valid"):
-      valid_input = PTBInput(config=config, data=valid_data, name="ValidInput")
-      with tf.variable_scope("Model", reuse=True, initializer=initializer):
-        mvalid = PTBModel(is_training=False, config=config, input_=valid_input)
-      tf.scalar_summary("Validation Loss", mvalid.cost)
+      with tf.name_scope("Valid"):
+        valid_input = PTBInput(config=config, data=valid_data, name="ValidInput")
+        with tf.variable_scope("Model", reuse=True, initializer=initializer):
+          mvalid = PTBModel(is_training=False, config=config, input_=valid_input)
+        tf.scalar_summary("Validation Loss", mvalid.cost)
 
-    with tf.name_scope("Test"):
-      test_input = PTBInput(config=config, data=test_data, name="TestInput")
-      with tf.variable_scope("Model", reuse=True, initializer=initializer):
-        mtest = PTBModel(is_training=False, config=eval_config,
-                         input_=test_input)
+      with tf.name_scope("Test"):
+        test_input = PTBInput(config=config, data=test_data, name="TestInput")
+        with tf.variable_scope("Model", reuse=True, initializer=initializer):
+          mtest = PTBModel(is_training=False, config=eval_config,
+                           input_=test_input)
+    else:
+      with tf.name_scope("Test"):
+        test_input = PTBInput(config=config, data=test_data, name="TestInput")
+        with tf.variable_scope("Model", reuse=None, initializer=initializer):
+          mtest = PTBModel(is_training=False, config=eval_config,
+                           input_=test_input)
+
 
     sv = tf.train.Supervisor(logdir=FLAGS.save_path)
 
     with sv.managed_session() as session:
       if FLAGS.test:
         print("Restoring model from " + FLAGS.save_path)
-        m.saver.restore(session, FLAGS.save_path + '-0')
+        mtest.saver.restore(session, FLAGS.save_path + '-0')
       else:
         for i in range(config.max_max_epoch):
           lr_decay = config.lr_decay ** max(i - config.max_epoch, 0.0)
