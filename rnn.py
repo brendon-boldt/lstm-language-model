@@ -42,8 +42,8 @@ flags.DEFINE_string("save_path", "tf_log/",
                     "Model output directory.")
 flags.DEFINE_bool("use_fp16", False,
                   "Train using 16-bit floats instead of 32bit floats")
-flags.DEFINE_bool("test", False,
-                  "Test model specfied by save_path.")
+flags.DEFINE_string("test", None,
+                  "Specify the model checkpoint to be tested.")
 
 FLAGS = flags.FLAGS
 
@@ -355,7 +355,7 @@ def main(_):
     initializer = tf.random_uniform_initializer(-config.init_scale,
                                                 config.init_scale)
 
-    if not FLAGS.test:
+    if FLAGS.test == None:
       with tf.name_scope("Train"):
         train_input = PTBInput(config=config, data=train_data, name="TrainInput")
         with tf.variable_scope("Model", reuse=None, initializer=initializer):
@@ -385,9 +385,9 @@ def main(_):
     sv = tf.train.Supervisor(logdir=FLAGS.save_path)
 
     with sv.managed_session() as session:
-      if FLAGS.test:
-        print("Restoring model from " + FLAGS.save_path)
-        mtest.saver.restore(session, FLAGS.save_path + '-0')
+      if FLAGS.test != None:
+        print("Restoring model from " + FLAGS.test)
+        mtest.saver.restore(session, FLAGS.test)
       else:
         for i in range(config.max_max_epoch):
           lr_decay = config.lr_decay ** max(i - config.max_epoch, 0.0)
@@ -403,10 +403,9 @@ def main(_):
       test_perplexity = run_epoch(session, mtest)
       print("Test Perplexity: %.3f" % test_perplexity)
 
-      if not FLAGS.test and FLAGS.save_path:
+      if FLAGS.test == None and FLAGS.save_path:
         print("Saving model to %s." % FLAGS.save_path)
-        sv.saver.save(session, FLAGS.save_path, global_step=0)
-        #sv.saver.save(session, FLAGS.save_path, global_step=sv.global_step)
+        sv.saver.save(session, FLAGS.save_path + 'save')
 
 
 if __name__ == "__main__":
