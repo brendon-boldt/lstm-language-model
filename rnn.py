@@ -317,10 +317,16 @@ def run_epoch(session, model, eval_op=None, verbose=False):
         print("top1 : %.3f" % (top1/num_predictions))
         print("top5 : %.3f" % (top5/num_predictions))
         print("top10: %.3f" % (top10/num_predictions))
-      '''
       top1, top5, top10, num_predictions = 0, 0, 0, 0
+      '''
 
-  return np.exp(costs / iters)
+  if FLAGS.test != None:
+    return (np.exp(costs / iters),
+      top1/num_predictions,
+      top5/num_predictions,
+      top10/num_predictions)
+  else:
+    return np.exp(costs / iters)
 
 
 def get_config():
@@ -400,7 +406,13 @@ def main(_):
           valid_perplexity = run_epoch(session, mvalid)
           print("Epoch: %d Valid Perplexity: %.3f" % (i + 1, valid_perplexity))
 
-      test_perplexity = run_epoch(session, mtest)
+      if FLAGS.test == None:
+        test_perplexity = run_epoch(session, mtest)
+      else:
+        test_perplexity, top1, top5, top10 = run_epoch(session, mtest)
+        print("Top 1  Acc: %.3f" % top1)
+        print("Top 5  Acc: %.3f" % top5)
+        print("Top 10 Acc: %.3f" % top10)
       print("Test Perplexity: %.3f" % test_perplexity)
 
       if FLAGS.test == None and FLAGS.save_path:
